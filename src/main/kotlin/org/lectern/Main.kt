@@ -5,6 +5,8 @@ import org.lectern.ast.ConstantFolder
 import org.lectern.ast.LivenessAnalyzer
 import org.lectern.ast.RegisterAllocator
 import org.lectern.lang.IrCompiler
+import org.lectern.ssa.SsaBuilder
+import org.lectern.ssa.SsaDeconstructor
 import org.lectern.lang.IrInstr
 import org.lectern.lang.Parser
 import org.lectern.lang.VM
@@ -34,10 +36,16 @@ fun main(args: Array<String>) {
         println("  $stmt")
     }
     val result = AstLowerer().lower(folded)
-    val ranges = LivenessAnalyzer().analyze(result.instrs)
+
+    // SSA round-trip: IR -> SSA -> IR (proves correctness)
+    val ssaFunc = SsaBuilder.build(result.instrs, result.constants)
+    val ssaDeconstructed = SsaDeconstructor.deconstruct(ssaFunc)
+    val ssaResult = AstLowerer.LoweredResult(ssaDeconstructed, result.constants)
+
+    val ranges = LivenessAnalyzer().analyze(ssaResult.instrs)
     val allocation = RegisterAllocator().allocate(ranges)
-    val rewritten = rewrite(result.instrs, allocation)
-    val chunk = IrCompiler().compile(AstLowerer.LoweredResult(rewritten, result.constants))
+    val rewritten = rewrite(ssaResult.instrs, allocation)
+    val chunk = IrCompiler().compile(AstLowerer.LoweredResult(rewritten, ssaResult.constants))
     println("\n=== Bytecode ===")
     chunk.disassemble()
     println("\n=== Execution ===")

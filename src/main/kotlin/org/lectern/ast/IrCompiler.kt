@@ -3,6 +3,8 @@ package org.lectern.lang
 import org.lectern.ast.AstLowerer
 import org.lectern.ast.LivenessAnalyzer
 import org.lectern.ast.RegisterAllocator
+import org.lectern.ssa.SsaBuilder
+import org.lectern.ssa.SsaDeconstructor
 
 class IrCompiler {
     fun compile(result: AstLowerer.LoweredResult): Chunk {
@@ -63,10 +65,14 @@ class IrCompiler {
                     chunk.write(OpCode.CALL, dst = instr.dst, src1 = instr.func, imm = instr.args.size)
                 }
                 is IrInstr.LoadFunc -> {
+                    // SSA round-trip on function body
+                    val funcSsa = SsaBuilder.build(instr.instrs, instr.constants, instr.arity)
+                    val funcDeconstructed = SsaDeconstructor.deconstruct(funcSsa)
+
                     // Run register allocation on the function body
-                    val funcRanges = LivenessAnalyzer().analyze(instr.instrs)
+                    val funcRanges = LivenessAnalyzer().analyze(funcDeconstructed)
                     val funcAllocation = RegisterAllocator().allocate(funcRanges, instr.arity)
-                    val funcRewritten = rewriteRegisters(instr.instrs, funcAllocation)
+                    val funcRewritten = rewriteRegisters(funcDeconstructed, funcAllocation)
                     val funcResult = AstLowerer.LoweredResult(funcRewritten, instr.constants)
                     val funcChunk = IrCompiler().compile(funcResult)
                     val idx = chunk.functions.size
@@ -123,9 +129,13 @@ class IrCompiler {
                     // Compile each method as a nested function chunk
                     val methodFuncIndices = mutableMapOf<String, Int>()
                     for ((methodName, methodInfo) in instr.methods) {
-                        val funcRanges = LivenessAnalyzer().analyze(methodInfo.instrs)
+                        // SSA round-trip on method body
+                        val methodSsa = SsaBuilder.build(methodInfo.instrs, methodInfo.constants, methodInfo.arity)
+                        val methodDeconstructed = SsaDeconstructor.deconstruct(methodSsa)
+
+                        val funcRanges = LivenessAnalyzer().analyze(methodDeconstructed)
                         val funcAllocation = RegisterAllocator().allocate(funcRanges, methodInfo.arity)
-                        val funcRewritten = rewriteRegisters(methodInfo.instrs, funcAllocation)
+                        val funcRewritten = rewriteRegisters(methodDeconstructed, funcAllocation)
                         val funcResult = AstLowerer.LoweredResult(funcRewritten, methodInfo.constants)
                         val funcChunk = IrCompiler().compile(funcResult)
                         val funcIdx = chunk.functions.size

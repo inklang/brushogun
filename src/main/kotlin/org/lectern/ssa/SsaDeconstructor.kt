@@ -201,6 +201,13 @@ class SsaDeconstructor(private val ssaFunc: SsaFunction) {
             }
         }
 
+        // Pre-assign parameter registers: SsaValue(i, 0) -> register i for i in 0..arity-1
+        val arity = ssaFunc.arity
+        for (i in 0 until arity) {
+            regMap[Pair(i, 0)] = i
+        }
+        nextReg = arity  // Start fresh registers after parameter registers
+
         // Each unique (baseReg, version) pair gets its own register
         for (value in allValues) {
             val key = Pair(value.baseReg, value.version)
