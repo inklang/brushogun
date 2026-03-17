@@ -404,4 +404,76 @@ class VMTest {
         val output = compileAndRun("print(9.0 ** 0.5)")
         assertEquals(listOf("3.0"), output)
     }
+
+    @Test
+    fun testAndTrue() {
+        val output = compileAndRun(
+            """
+            let a = true and true
+            print(a)
+            """.trimIndent()
+        )
+        assertEquals(listOf("Boolean(value=true)"), output)
+    }
+
+    @Test
+    fun testAndFalse() {
+        val output = compileAndRun(
+            """
+            let a = true and false
+            print(a)
+            """.trimIndent()
+        )
+        assertEquals(listOf("Boolean(value=false)"), output)
+    }
+
+    @Test
+    fun testAndShortCircuit() {
+        // RHS should not be evaluated when LHS is false — x stays 0
+        val output = compileAndRun(
+            """
+            let x = 0
+            let result = false and (x == 1)
+            print(result)
+            print(x)
+            """.trimIndent()
+        )
+        assertEquals(listOf("Boolean(value=false)", "0"), output)
+    }
+
+    @Test
+    fun testOrTrue() {
+        val output = compileAndRun(
+            """
+            let a = false or true
+            print(a)
+            """.trimIndent()
+        )
+        assertEquals(listOf("Boolean(value=true)"), output)
+    }
+
+    @Test
+    fun testOrFalse() {
+        val output = compileAndRun(
+            """
+            let a = false or false
+            print(a)
+            """.trimIndent()
+        )
+        assertEquals(listOf("Boolean(value=false)"), output)
+    }
+
+    @Test
+    fun testOrShortCircuit() {
+        // RHS should not be evaluated when LHS is true — x stays 0
+        val output = compileAndRun(
+            """
+            let x = 0
+            let result = true or (x == 1)
+            print(result)
+            print(x)
+            """.trimIndent()
+        )
+        assertEquals(listOf("Boolean(value=true)", "0"), output)
+    }
 }

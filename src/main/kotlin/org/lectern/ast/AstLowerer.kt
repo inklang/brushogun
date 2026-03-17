@@ -313,9 +313,39 @@ class AstLowerer {
             }
         }
         is Expr.BinaryExpr -> {
-            val src1 = lowerExpr(expr.left, freshReg())
-            val src2 = lowerExpr(expr.right, freshReg())
-            emit(BinaryOp(dst, expr.op.type, src1, src2))
+            when (expr.op.type) {
+                TokenType.KW_AND -> {
+                    // Short-circuit AND:
+                    // evaluate a; if falsy → result = a; else → result = b
+                    val shortCircuit = freshLabel()
+                    val end = freshLabel()
+                    val aReg = lowerExpr(expr.left, freshReg())
+                    emit(IrInstr.JumpIfFalse(aReg, shortCircuit))
+                    lowerExpr(expr.right, dst)
+                    emit(IrInstr.Jump(end))
+                    emit(IrInstr.Label(shortCircuit))
+                    emit(IrInstr.Move(dst, aReg))
+                    emit(IrInstr.Label(end))
+                }
+                TokenType.KW_OR -> {
+                    // Short-circuit OR:
+                    // evaluate a; if truthy → result = a; else → result = b
+                    val orFalse = freshLabel()
+                    val end = freshLabel()
+                    val aReg = lowerExpr(expr.left, freshReg())
+                    emit(IrInstr.JumpIfFalse(aReg, orFalse))
+                    emit(IrInstr.Move(dst, aReg))
+                    emit(IrInstr.Jump(end))
+                    emit(IrInstr.Label(orFalse))
+                    lowerExpr(expr.right, dst)
+                    emit(IrInstr.Label(end))
+                }
+                else -> {
+                    val src1 = lowerExpr(expr.left, freshReg())
+                    val src2 = lowerExpr(expr.right, freshReg())
+                    emit(BinaryOp(dst, expr.op.type, src1, src2))
+                }
+            }
             dst
         }
         is Expr.UnaryExpr -> {
