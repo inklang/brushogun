@@ -326,6 +326,40 @@ class SsaTest {
         assertTrue(dstRegs.size >= 3, "Different SSA versions must get different registers, got $dstRegs")
     }
 
+    @Test
+    fun testSsaDeconstructorPhiMultiplePredecessors() {
+        labelCounter = 0
+        val constants = listOf(Value.Int(1), Value.Int(2))
+
+        val lThen = label()
+        val lElse = label()
+        val lMerge = label()
+
+        // if (cond) { x = 1 } else { x = 2 }; return x
+        val instrs = listOf(
+            IrInstr.LoadImm(0, 0),         // cond = 1
+            IrInstr.JumpIfFalse(0, lElse),
+            IrInstr.Label(lThen),
+            IrInstr.LoadImm(1, 0),         // x = 1 (then branch)
+            IrInstr.Jump(lMerge),
+            IrInstr.Label(lElse),
+            IrInstr.LoadImm(1, 1),         // x = 2 (else branch)
+            IrInstr.Label(lMerge),
+            IrInstr.Return(1)
+        )
+
+        val ssaFunc = SsaBuilder.build(instrs, constants)
+        val deconstructed = SsaDeconstructor.deconstruct(ssaFunc)
+
+        println("Multi-predecessor deconstructed:")
+        deconstructed.forEach { println("  $it") }
+
+        val moves = deconstructed.filterIsInstance<IrInstr.Move>()
+        assertTrue(moves.isNotEmpty(), "Phi resolution should insert Move instructions")
+        val ret = deconstructed.last()
+        assertTrue(ret is IrInstr.Return, "Last instruction should be Return")
+    }
+
     /**
      * Test: SSA pipeline with optimization.
      */

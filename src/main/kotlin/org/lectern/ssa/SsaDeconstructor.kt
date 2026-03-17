@@ -6,9 +6,10 @@ import org.lectern.lang.*
  * Deconstructs SSA form back to normal IR.
  *
  * Algorithm:
- * 1. Convert phi functions to parallel copies in predecessor blocks
- * 2. Sequentialize parallel copies to handle dependencies
- * 3. Convert SsaInstr back to IrInstr
+ * 1. Resolve phi functions into copy pairs keyed by predecessor block ID
+ * 2. Assign unique registers to all SSA values (including phi operands)
+ * 3. Emit IR with phi-resolution moves inserted in predecessor blocks before terminals
+ * 4. Sequentialize parallel copies to handle dependencies
  */
 class SsaDeconstructor(private val ssaFunc: SsaFunction) {
     // Map from (baseReg, version) to a new register number
@@ -16,6 +17,9 @@ class SsaDeconstructor(private val ssaFunc: SsaFunction) {
 
     // Next available register number
     private var nextReg = 0
+
+    // Stores (dstSsaValue, srcSsaValue) per predecessor block
+    private val phiCopies = mutableMapOf<Int, MutableList<Pair<SsaValue, SsaValue>>>()
 
     /**
      * Deconstruct SSA form back to IR instructions.
@@ -25,31 +29,38 @@ class SsaDeconstructor(private val ssaFunc: SsaFunction) {
             return emptyList()
         }
 
-        // First pass: assign register numbers to all SSA values
+        // Step 1: Resolve phis — collect copy pairs per predecessor
+        resolvePhis()
+
+        // Step 2: Assign registers (covers all SSA values including phi operands)
         assignRegisters()
 
-        // Second pass: convert instructions and insert copies for phis
+        // Step 3: Emit IR with phi-resolution moves in predecessor blocks
         val result = mutableListOf<IrInstr>()
 
         for (block in ssaFunc.blocks) {
-            // Add label if present
             if (block.label != null) {
                 result.add(IrInstr.Label(block.label))
             }
 
-            // Convert phi functions to moves
-            // For each predecessor, we need to insert moves
-            // For simplicity, we insert moves at the start of the block
-            // (proper implementation would insert in predecessor blocks)
-            val phiMoves = convertPhis(block)
-            result.addAll(phiMoves)
+            val instrCount = block.instrs.size
+            for ((i, instr) in block.instrs.withIndex()) {
+                val isTerminal = i == instrCount - 1 && isTerminalInstr(instr)
 
-            // Convert regular instructions
-            for (instr in block.instrs) {
+                // Insert phi-resolution moves before the terminal instruction
+                if (isTerminal) {
+                    emitPhiMoves(block.id, result)
+                }
+
                 val irInstr = convertInstr(instr)
                 if (irInstr != null) {
                     result.add(irInstr)
                 }
+            }
+
+            // Fallthrough blocks: emit phi moves at end
+            if (block.instrs.isEmpty() || !isTerminalInstr(block.instrs.last())) {
+                emitPhiMoves(block.id, result)
             }
         }
 
@@ -57,22 +68,136 @@ class SsaDeconstructor(private val ssaFunc: SsaFunction) {
     }
 
     /**
+     * Resolve phi functions into copy pairs per predecessor block.
+     */
+    private fun resolvePhis() {
+        for (block in ssaFunc.blocks) {
+            if (block.phiFunctions.isEmpty()) continue
+            for (phi in block.phiFunctions) {
+                for ((predId, srcValue) in phi.operands) {
+                    if (srcValue == SsaValue.UNDEFINED) continue
+                    phiCopies.getOrPut(predId) { mutableListOf() }
+                        .add(Pair(phi.result, srcValue))
+                }
+            }
+        }
+    }
+
+    /**
+     * Emit phi-resolution moves for a given block.
+     */
+    private fun emitPhiMoves(blockId: Int, result: MutableList<IrInstr>) {
+        val copies = phiCopies[blockId] ?: return
+        val moves = sequentializeCopies(copies)
+        result.addAll(moves)
+    }
+
+    /**
+     * Sequentialize parallel copies to handle dependencies.
+     * Handles non-conflicting moves first, then circular dependencies with a temp register.
+     */
+    private fun sequentializeCopies(copies: List<Pair<SsaValue, SsaValue>>): List<IrInstr> {
+        val moves = mutableListOf<IrInstr>()
+        val emitted = mutableSetOf<Int>()
+
+        // First pass: emit non-conflicting moves
+        var changed = true
+        while (changed) {
+            changed = false
+            for ((i, pair) in copies.withIndex()) {
+                if (i in emitted) continue
+                val (dst, src) = pair
+                val dstReg = mapReg(dst)
+                val srcReg = mapReg(src)
+                if (dstReg == srcReg) {
+                    emitted.add(i)
+                    changed = true
+                    continue
+                }
+                val conflictsWithOther = copies.indices.any { j ->
+                    j !in emitted && j != i && mapReg(copies[j].second) == dstReg
+                }
+                if (!conflictsWithOther) {
+                    moves.add(IrInstr.Move(dstReg, srcReg))
+                    emitted.add(i)
+                    changed = true
+                }
+            }
+        }
+
+        // Second pass: handle circular dependencies with temp register
+        val remaining = copies.indices.filter { it !in emitted }
+        if (remaining.isNotEmpty()) {
+            val firstIdx = remaining.first()
+            val (firstDst, firstSrc) = copies[firstIdx]
+            val firstSrcReg = mapReg(firstSrc)
+            val firstDstReg = mapReg(firstDst)
+            val tempReg = nextReg++
+            moves.add(IrInstr.Move(tempReg, firstSrcReg))
+
+            var currentDst = firstDstReg
+            val chainEmitted = mutableSetOf(firstIdx)
+            var foundNext = true
+            while (foundNext) {
+                foundNext = false
+                for (j in remaining) {
+                    if (j in chainEmitted) continue
+                    val (dst, src) = copies[j]
+                    if (mapReg(src) == currentDst) {
+                        moves.add(IrInstr.Move(mapReg(dst), mapReg(src)))
+                        currentDst = mapReg(dst)
+                        chainEmitted.add(j)
+                        foundNext = true
+                        break
+                    }
+                }
+            }
+            moves.add(IrInstr.Move(firstDstReg, tempReg))
+
+            // Any remaining non-cycle copies
+            for (j in remaining) {
+                if (j in chainEmitted) continue
+                val (dst, src) = copies[j]
+                val dstReg = mapReg(dst)
+                val srcReg = mapReg(src)
+                if (dstReg != srcReg) {
+                    moves.add(IrInstr.Move(dstReg, srcReg))
+                }
+            }
+        }
+
+        return moves
+    }
+
+    /**
+     * Check if an instruction is a terminal (block-ending) instruction.
+     */
+    private fun isTerminalInstr(instr: SsaInstr): Boolean =
+        instr is SsaInstr.Jump || instr is SsaInstr.JumpIfFalse ||
+        instr is SsaInstr.Return || instr is SsaInstr.Break || instr is SsaInstr.Next
+
+    /**
      * Assign register numbers to all SSA values.
      */
     private fun assignRegisters() {
-        // Collect all SSA values
         val allValues = mutableSetOf<SsaValue>()
 
         for (block in ssaFunc.blocks) {
-            // Phi results and operands
             for (phi in block.phiFunctions) {
                 allValues.add(phi.result)
                 allValues.addAll(phi.operands.values)
             }
-            // Instruction definitions and uses
             for (instr in block.instrs) {
                 instr.definedValue?.let { allValues.add(it) }
                 allValues.addAll(instr.usedValues)
+            }
+        }
+
+        // Also collect SSA values from phi copies
+        for ((_, copies) in phiCopies) {
+            for ((dst, src) in copies) {
+                allValues.add(dst)
+                allValues.add(src)
             }
         }
 
@@ -86,55 +211,6 @@ class SsaDeconstructor(private val ssaFunc: SsaFunction) {
 
         // Handle undefined values
         regMap[Pair(-1, -1)] = regMap[Pair(-1, -1)] ?: nextReg++
-    }
-
-    /**
-     * Convert phi functions to move instructions.
-     *
-     * For simplicity, we insert moves at the start of the block.
-     * A more sophisticated implementation would insert copies in predecessor blocks
-     * and handle critical edge splitting.
-     */
-    private fun convertPhis(block: SsaBlock): List<IrInstr> {
-        if (block.phiFunctions.isEmpty()) {
-            return emptyList()
-        }
-
-        val moves = mutableListOf<IrInstr>()
-
-        for (phi in block.phiFunctions) {
-            val dstReg = regMap[Pair(phi.result.baseReg, phi.result.version)] ?: continue
-
-            // For the phi, we need to select the right value based on the predecessor
-            // Since we can't know the predecessor at this point, we use a simple approach:
-            // If there's only one predecessor, use that value directly
-            // Otherwise, we need to insert moves in predecessor blocks (complex)
-
-            if (block.predecessors.size == 1) {
-                val predId = block.predecessors.first()
-                val srcValue = phi.operands[predId]
-                if (srcValue != null && srcValue != SsaValue.UNDEFINED) {
-                    val srcReg = regMap[Pair(srcValue.baseReg, srcValue.version)]
-                    if (srcReg != null && srcReg != dstReg) {
-                        moves.add(IrInstr.Move(dstReg, srcReg))
-                    }
-                }
-            } else {
-                // Multiple predecessors: use the first non-undefined operand
-                // This is a simplification - proper implementation needs critical edge splitting
-                for ((_, srcValue) in phi.operands) {
-                    if (srcValue != SsaValue.UNDEFINED) {
-                        val srcReg = regMap[Pair(srcValue.baseReg, srcValue.version)]
-                        if (srcReg != null && srcReg != dstReg) {
-                            moves.add(IrInstr.Move(dstReg, srcReg))
-                        }
-                        break
-                    }
-                }
-            }
-        }
-
-        return moves
     }
 
     /**
