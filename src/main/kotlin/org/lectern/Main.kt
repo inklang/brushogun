@@ -6,8 +6,6 @@ import org.lectern.ast.LivenessAnalyzer
 import org.lectern.ast.RegisterAllocator
 import org.lectern.ast.SpillInserter
 import org.lectern.lang.IrCompiler
-import org.lectern.ssa.SsaBuilder
-import org.lectern.ssa.SsaDeconstructor
 import org.lectern.lang.Parser
 import org.lectern.lang.VM
 import org.lectern.lang.Value
@@ -37,10 +35,9 @@ fun main(args: Array<String>) {
     }
     val result = AstLowerer().lower(folded)
 
-    // SSA round-trip: IR -> SSA -> IR (proves correctness)
-    val ssaFunc = SsaBuilder.build(result.instrs, result.constants)
-    val ssaDeconstructed = SsaDeconstructor.deconstruct(ssaFunc)
-    val ssaResult = AstLowerer.LoweredResult(ssaDeconstructed, result.constants)
+    // SSA round-trip with optimizations: IR -> SSA -> IR
+    val (ssaDeconstructed, ssaOptConstants) = IrCompiler.optimizedSsaRoundTrip(result.instrs, result.constants)
+    val ssaResult = AstLowerer.LoweredResult(ssaDeconstructed, ssaOptConstants)
 
     val ranges = LivenessAnalyzer().analyze(ssaResult.instrs)
     val allocResult = RegisterAllocator().allocate(ranges)

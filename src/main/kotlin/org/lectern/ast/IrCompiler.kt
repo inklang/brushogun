@@ -4,10 +4,35 @@ import org.lectern.ast.AstLowerer
 import org.lectern.ast.LivenessAnalyzer
 import org.lectern.ast.RegisterAllocator
 import org.lectern.ast.SpillInserter
+import org.lectern.opt.OptimizationPipeline
+import org.lectern.opt.passes.ConstantFoldingPass
+import org.lectern.opt.passes.DeadCodeEliminationPass
 import org.lectern.ssa.SsaBuilder
 import org.lectern.ssa.SsaDeconstructor
+import org.lectern.ssa.passes.SsaConstantPropagationPass
+import org.lectern.ssa.passes.SsaDeadCodeEliminationPass
 
 class IrCompiler {
+    companion object {
+        fun optimizedSsaRoundTrip(
+            instrs: List<IrInstr>,
+            constants: List<Value>
+        ): Pair<List<IrInstr>, List<Value>> = OptimizationPipeline.optimizeWithSsa(
+            instrs,
+            constants,
+            ssaPasses = listOf(
+                SsaConstantPropagationPass(),
+                SsaDeadCodeEliminationPass()
+            ),
+            preSsaPasses = listOf(
+                ConstantFoldingPass()
+            ),
+            postSsaPasses = listOf(
+                DeadCodeEliminationPass()
+            )
+        )
+    }
+
     fun compile(result: AstLowerer.LoweredResult): Chunk {
         val chunk = Chunk()
         chunk.constants.addAll(result.constants)
@@ -67,7 +92,7 @@ class IrCompiler {
                     chunk.write(OpCode.CALL, dst = instr.dst, src1 = instr.func, imm = instr.args.size)
                 }
                 is IrInstr.LoadFunc -> {
-                    // SSA round-trip on function body
+                    // SSA round-trip on function body (arity must be passed to preserve parameter registers)
                     val funcSsa = SsaBuilder.build(instr.instrs, instr.constants, instr.arity)
                     val funcDeconstructed = SsaDeconstructor.deconstruct(funcSsa)
 
