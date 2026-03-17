@@ -476,4 +476,32 @@ class VMTest {
         )
         assertEquals(listOf("Boolean(value=true)", "0"), output)
     }
+
+    @Test
+    fun testPrefixIncrement() {
+        val output = compileAndRun(
+            """
+            let x = 5
+            let y = ++x
+            print(x)
+            print(y)
+            """.trimIndent()
+        )
+        // Both x and y should be 6 (prefix: mutate then return new value)
+        assertEquals(listOf("6", "6"), output)
+    }
+
+    @Test
+    fun testPrefixDecrement() {
+        val output = compileAndRun(
+            """
+            let x = 10
+            ++x
+            ++x
+            --x
+            print(x)
+            """.trimIndent()
+        )
+        assertEquals(listOf("11"), output)
+    }
 }

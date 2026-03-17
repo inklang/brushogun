@@ -349,8 +349,27 @@ class AstLowerer {
             dst
         }
         is Expr.UnaryExpr -> {
-            val src = lowerExpr(expr.right, freshReg())
-            emit(UnaryOp(dst, expr.op.type, src))
+            if (expr.op.type == TokenType.INCREMENT || expr.op.type == TokenType.DECREMENT) {
+                // Prefix ++/--: mutate the variable and return the new value
+                val target = expr.right as? Expr.VariableExpr
+                    ?: error("++/-- can only be applied to simple variables")
+                val delta = if (expr.op.type == TokenType.INCREMENT) TokenType.PLUS else TokenType.MINUS
+                val oneIdx = addConstant(Value.Int(1))
+                val oneReg = freshReg()
+                emit(LoadImm(oneReg, oneIdx))
+                val srcReg = lowerExpr(expr.right, freshReg())
+                emit(BinaryOp(dst, delta, srcReg, oneReg))
+                // Write back
+                val reg = locals[target.name.lexeme]
+                if (reg != null) {
+                    emit(IrInstr.Move(reg, dst))
+                } else {
+                    emit(StoreGlobal(target.name.lexeme, dst))
+                }
+            } else {
+                val src = lowerExpr(expr.right, freshReg())
+                emit(UnaryOp(dst, expr.op.type, src))
+            }
             dst
         }
         is Expr.AssignExpr -> {

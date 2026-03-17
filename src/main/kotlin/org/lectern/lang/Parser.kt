@@ -363,6 +363,8 @@ class Parser(private val tokens: List<Token>) {
             TokenType.MINUS -> Expr.UnaryExpr(token, parseExpression(90))
             TokenType.BANG -> Expr.UnaryExpr(token, parseExpression(90))
             TokenType.KW_NOT -> Expr.UnaryExpr(token, parseExpression(90))
+            TokenType.INCREMENT -> Expr.UnaryExpr(token, parseExpression(90))
+            TokenType.DECREMENT -> Expr.UnaryExpr(token, parseExpression(90))
             TokenType.L_BRACE -> {
                 // Map literal in expression position: { key: value, ... }
                 val entries = mutableListOf<Pair<Expr, Expr>>()
