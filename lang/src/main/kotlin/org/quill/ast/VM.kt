@@ -1,6 +1,7 @@
 package org.quill.lang
 
 import org.quill.lang.Value.*
+import org.quill.lang.getStringMethod
 
 fun valueToString(v: Value): String = when (v) {
     is Value.Instance -> {
@@ -20,6 +21,10 @@ fun valueToString(v: Value): String = when (v) {
 }
 
 class VM {
+    // Pre-created instances for stdlib - must be initialized before globals
+    private val mathInstance = Builtins.newMath()
+    private val randomInstance = Builtins.newRandom()
+
     val globals = mutableMapOf<String, Value>(
         "Array" to Value.Class(Builtins.ArrayClass),
         "Map" to Value.Class(Builtins.MapClass),
@@ -31,6 +36,9 @@ class VM {
             println(args.joinToString(" ") { valueToString(it) })
             Value.Null
         },
+        // Stdlib instances for import
+        "math" to mathInstance,
+        "random" to randomInstance,
     )
 
     data class CallFrame(
@@ -201,6 +209,8 @@ class VM {
                     val obj = frame.regs[src1] ?: error("Cannot get field on null")
                     val fieldName = frame.chunk.strings[imm]
                     frame.regs[dst] = when (obj) {
+                        is Value.String -> getStringMethod(obj, fieldName)
+                            ?: error("String has no method '$fieldName'")
                         is Value.Instance -> {
                             // Check fields first
                             obj.fields[fieldName]?.let { it }

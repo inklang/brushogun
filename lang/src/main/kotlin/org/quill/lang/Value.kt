@@ -77,6 +77,80 @@ sealed class Value {
     }
 }
 
+// === String method helpers ===
+
+private fun expectString(v: Value): String = (v as? Value.String)?.value
+    ?: error("Expected string, got $v")
+
+private fun expectInt(v: Value): Int = (v as? Value.Int)?.value
+    ?: error("Expected int, got $v")
+
+private fun stringSplit(self: String, delim: String?): Value.Instance {
+    val parts = if (delim == null || delim.isEmpty()) {
+        self.map { it.toString() }
+    } else {
+        self.split(delim)
+    }
+    return Builtins.newArray(parts.map { Value.String(it) }.toMutableList())
+}
+
+fun getStringMethod(self: Value.String, name: String): Value? {
+    return when (name) {
+        "split" -> Value.NativeFunction { args ->
+            stringSplit(self.value, args.getOrNull(0)?.let { expectString(it) })
+        }
+        "trim" -> Value.NativeFunction { _ ->
+            Value.String(self.value.trim())
+        }
+        "contains" -> Value.NativeFunction { args ->
+            Value.Boolean(self.value.contains(expectString(args[0])))
+        }
+        "replace" -> Value.NativeFunction { args ->
+            Value.String(self.value.replace(expectString(args[0]), expectString(args[1]), false))
+        }
+        "replaceAll" -> Value.NativeFunction { args ->
+            Value.String(self.value.replace(expectString(args[0]), expectString(args[1]), true))
+        }
+        "toUpperCase" -> Value.NativeFunction { _ ->
+            Value.String(self.value.uppercase())
+        }
+        "toLowerCase" -> Value.NativeFunction { _ ->
+            Value.String(self.value.lowercase())
+        }
+        "startsWith" -> Value.NativeFunction { args ->
+            Value.Boolean(self.value.startsWith(expectString(args[0])))
+        }
+        "endsWith" -> Value.NativeFunction { args ->
+            Value.Boolean(self.value.endsWith(expectString(args[0])))
+        }
+        "indexOf" -> Value.NativeFunction { args ->
+            Value.Int(self.value.indexOf(expectString(args[0])).also { if (it < 0) return@NativeFunction Value.Int(-1) })
+        }
+        "length" -> Value.NativeFunction { _ ->
+            Value.Int(self.value.length)
+        }
+        "isEmpty" -> Value.NativeFunction { _ ->
+            if (self.value.isEmpty()) Value.Boolean.TRUE else Value.Boolean.FALSE
+        }
+        "isBlank" -> Value.NativeFunction { _ ->
+            if (self.value.isBlank()) Value.Boolean.TRUE else Value.Boolean.FALSE
+        }
+        "chars" -> Value.NativeFunction { _ ->
+            Builtins.newArray(self.value.map { Value.String(it.toString()) }.toMutableList())
+        }
+        "get" -> Value.NativeFunction { args ->
+            val idx = expectInt(args[0])
+            if (idx >= 0 && idx < self.value.length) {
+                Value.String(self.value[idx].toString())
+            } else {
+                // TODO: throw StringIndexOutOfBoundsError instead of returning null
+                Value.Null
+            }
+        }
+        else -> null
+    }
+}
+
 object Builtins {
     val RangeClass = ClassDescriptor(
         name = "Range",
@@ -396,4 +470,62 @@ object Builtins {
             TupleClass,
             mutableMapOf("__tuple" to Value.InternalTuple(items))
         )
+
+    private fun toDouble(v: Value): Double = when (v) {
+        is Value.Int -> v.value.toDouble()
+        is Value.Float -> v.value.toDouble()
+        is Value.Double -> v.value
+        else -> error("Expected number, got $v")
+    }
+
+    val MathClass = ClassDescriptor(
+        name = "Math",
+        superClass = null,
+        methods = mapOf(
+            "abs" to Value.NativeFunction { args ->
+                val v = toDouble(args[1])  // args[0] is self
+                Value.Double(kotlin.math.abs(v))
+            },
+            "min" to Value.NativeFunction { args ->
+                val a = toDouble(args[1])  // args[0] is self
+                val b = toDouble(args[2])
+                Value.Double(kotlin.math.min(a, b))
+            },
+            "max" to Value.NativeFunction { args ->
+                val a = toDouble(args[1])  // args[0] is self
+                val b = toDouble(args[2])
+                Value.Double(kotlin.math.max(a, b))
+            },
+            "pow" to Value.NativeFunction { args ->
+                val base = toDouble(args[1])  // args[0] is self
+                val exp = toDouble(args[2])
+                Value.Double(Math.pow(base, exp))
+            },
+            "floor" to Value.NativeFunction { args ->
+                val v = toDouble(args[1])  // args[0] is self
+                Value.Double(kotlin.math.floor(v))
+            },
+            "ceil" to Value.NativeFunction { args ->
+                val v = toDouble(args[1])  // args[0] is self
+                Value.Double(kotlin.math.ceil(v))
+            },
+            "round" to Value.NativeFunction { args ->
+                val v = toDouble(args[1])  // args[0] is self
+                Value.Double(kotlin.math.round(v))
+            }
+        )
+    )
+
+    val RandomClass = ClassDescriptor(
+        name = "Random",
+        superClass = null,
+        methods = mapOf(
+            "random" to Value.NativeFunction { _ ->
+                Value.Double(Math.random())
+            }
+        )
+    )
+
+    fun newMath(): Value.Instance = Value.Instance(MathClass, mutableMapOf())
+    fun newRandom(): Value.Instance = Value.Instance(RandomClass, mutableMapOf())
 }
