@@ -41,24 +41,23 @@ Both parallel existing `InternalList` / `InternalMap` patterns.
 
 ```
 methods:
-  init      → self.fields["__entries"] = InternalSet(); return Null
+  init(self, ...constructorArgs) →
+      self.fields["__entries"] = InternalSet()
+      for each arg in constructorArgs: entries.add(arg)
+      return Null
   add(item) → entries.add(item); return Null
   has(item) → return Boolean(entries.contains(item))
   remove(item) → entries.remove(item); return Null
   size      → return Int(entries.size)
   clear     → entries.clear(); return Null
   delete(item) → alias for remove(item)
-  iter      → return ArrayIterator-backed iterator over entries (can reuse ArrayIteratorClass with InternalSet wrapped as InternalList, or new dedicated SetIteratorClass)
+  iter      → return SetIteratorClass instance (see Section 8)
+
+internal storage:
+  self.fields["__entries"] = InternalSet (MutableSet<Value>)
 ```
 
-**Iterator**: Reuse `ArrayIteratorClass` but with a `SetIterator` class instead to avoid boxing `InternalSet` into `InternalList`.
-
-```
-SetIteratorClass:
-  fields: __entries (InternalSet), __items (List<Value> derived once at iter() call for consistent iteration), current (Int)
-  hasNext → current < items.size
-  next    → items[current]; current++
-```
+Note: `NEW_INSTANCE` passes constructor args to `init` via the arg buffer. `init(self, ...args)` receives `args[0] = self`, `args[1..] = constructor arguments`. For `Set()`, `constructorArgs` is empty.
 
 Note: set iteration order is undefined but must be deterministic within a single `iter()` call.
 
@@ -66,20 +65,28 @@ Note: set iteration order is undefined but must be deterministic within a single
 
 ```
 methods:
-  size → return Int(items.size)
-  get(index) → return items[index] (0-based)
+  init(self, ...constructorArgs) →
+      self.fields["__tuple"] = InternalTuple(constructorArgs.toList())
+      return Null
+  size      → return Int((self.fields["__tuple"] as InternalTuple).items.size)
+  get(index) → return items[index] (0-based); returns Value.Null on out-of-bounds
   has(item) → return Boolean(items.contains(item))
-  iter → return ArrayIterator over items (reuse ArrayIteratorClass)
+  iter      → return ArrayIteratorClass instance over items (reuse ArrayIteratorClass)
 ```
 
 Tuple is immutable — **no `set`, `add`, `remove`, `clear` methods**.
 
+**Internal storage:** `self.fields["__tuple"] = InternalTuple(items)` — the items list is stored inside the `InternalTuple` wrapper, not spread across individual fields.
+
 ```
 factory constructor: Tuple(arg1, arg2, ...)
   → LoadClass("Tuple")
-  → NewInstance with args
-  → init() stores args as InternalTuple(items.toList()) in self.fields["__items"]
+  → NewInstance with args [arg1Reg, arg2Reg, ...]
+  → NEW_INSTANCE drains arg buffer and passes to init(self, arg1, arg2, ...)
+  → init() constructs InternalTuple(args) and stores in self.fields["__tuple"]
 ```
+
+Note: `NEW_INSTANCE` passes constructor args to `init` via the arg buffer. `init(self, ...args)` receives `args[0] = self`, `args[1..] = constructor arguments`. For `Tuple()`, `constructorArgs` is empty.
 
 **Empty tuple `()`**: Valid. `Tuple()` with zero arguments is the empty tuple literal. Single element `(a,)` requires trailing comma; `(a)` without a trailing comma is grouping, not a tuple.
 
@@ -191,10 +198,20 @@ Follows existing Lectern patterns (no new error mechanisms):
 
 No type errors are raised at runtime for these cases — Lectern's type system is dynamic at runtime.
 
+## What Is Not In Scope
+
 - Set operations `union`, `intersection`, `difference` as built-in methods — can be added later as Lectern stdlib functions
 - Ordered sets or linked sets
 - Nested tuples / heterogeneous tuples (all types in a tuple use the same `Value` representation)
 - `for x in set` with undefined order acknowledged (iteration order is JVM's hashmap order)
+
+## Additional Notes
+
+**For loop integration**: `for x in expr { body }` already desugars to `let __iter = expr.iter(); while(__iter.hasNext()) { let x = __iter.next(); body }` in `lowerForRange` (`AstLowerer.kt`, line 169). No changes needed — Set and Tuple only need to implement `iter()`, `hasNext()`, and `next()`.
+
+**Negative indexing**: Not supported. `tuple[-1]` returns `Value.Null`, consistent with Array behavior.
+
+**Equality (`==`)**: Works via `Value.equals` (Kotlin data class equality). `Value.Int`, `Value.String`, etc. use value equality. `Value.Instance` uses reference equality unless the class overrides it. No special handling needed for Set or Tuple.
 
 ## Testing
 
