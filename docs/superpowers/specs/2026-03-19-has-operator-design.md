@@ -9,7 +9,9 @@
 
 Add a `has` keyword to Lectern that checks whether an object or map contains a named field. Returns `true`/`false`.
 
-**Syntax:** `expr has stringLiteral`
+**Syntax:** `expr has expr`
+
+The right-hand side is any expression that evaluates to a string — typically a string literal like `"fieldName"`, but a variable holding a string also works.
 
 ---
 
@@ -18,7 +20,7 @@ Add a `has` keyword to Lectern that checks whether an object or map contains a n
 - Returns `true` if the object/map has the named field (own **or inherited** via prototype chain), `false` otherwise
 - Works on: objects (class instances) and maps
 - Does NOT work on arrays — arrays use numeric indices and this is out of scope
-- The field name must be a string literal (`"fieldName"`), enabling dynamic checks via variables
+- The field name expression is evaluated at runtime (must resolve to a string)
 
 ---
 
@@ -30,16 +32,16 @@ Add `KW_HAS` to `TokenType` enum in `Token.kt` and handle the `"has"` keyword in
 
 ### Parser — `src/main/kotlin/org/lectern/lang/Parser.kt`
 
-New prefix expression with precedence lower than member access (`DOT`):
+New prefix expression with precedence **45** (tighter than `==`/`!=` at 40, looser than `.` at 90):
 
 ```
-hasExpr -> "has" expression stringLiteral
+hasExpr -> "has" expression expression
 ```
 
 - Left operand: the object or map to check
-- Right operand: a string literal naming the field
+- Right operand: any expression that evaluates to a string (typically a string literal)
 
-Precedence: should bind tighter than `==`/`!=` but looser than member access. Think of it as `has(obj, "field")` in spirit.
+Precedence level 45 sits between `EQ_EQ`/`BANG_EQ` (40) and `LT`/`GT`/`LTE`/`GTE` (50). This means `obj has "field" == true` parses as `(obj has "field") == true`.
 
 ### AST — `src/main/kotlin/org/lectern/lang/AST.kt`
 
@@ -48,7 +50,7 @@ New expression node:
 ```kotlin
 data class HasExpr(
     val target: Expr,      // object or map being checked
-    val field: String     // field name as a String
+    val field: Expr       // expression that evaluates to the field name string
 ) : Expr()
 ```
 
@@ -59,10 +61,13 @@ Lowers `HasExpr` to a new IR instruction:
 ```kotlin
 is Expr.HasExpr -> {
     val objReg = lowerExpr(expr.target, freshReg())
-    emit(IrInstr.HasCheck(dst, objReg, expr.field))
+    val fieldReg = lowerExpr(expr.field, freshReg())
+    emit(IrInstr.HasCheck(dst, objReg, fieldReg))
     dst
 }
 ```
+
+The `fieldReg` register holds the string value of the field name to check.
 
 ### IR — `src/main/kotlin/org/lectern/lang/IR.kt`
 
@@ -72,16 +77,16 @@ New `IrInstr` subclass:
 data class HasCheck(
     val dst: Int,           // destination register (boolean result)
     val obj: Int,           // register holding the object/map
-    val field: String       // field name to check
+    val field: Int          // register holding the field name string
 ) : IrInstr()
 ```
 
 ### OpCode — `src/main/kotlin/org/lectern/lang/OpCode.kt`
 
-New opcode:
+New opcode (after `POW(0x28)`):
 
 ```kotlin
-HAS(0x??)    // dst = obj.has(field) — true if field exists
+HAS(0x29)    // dst = obj.has(field) — true if field exists
 ```
 
 ### IrCompiler — `src/main/kotlin/org/lectern/ast/IrCompiler.kt`
@@ -99,13 +104,16 @@ Add case for `IrInstr.HasCheck`:
 `HAS` opcode dispatch:
 
 1. **If object is `Value.Instance`**:
+   - `fieldName` is in a register — call `valueToString()` to get the string key
    - Check `instance.fields.containsKey(fieldName)`
    - If not found and `instance.klass.superClass != null`, walk the superClass chain
    - Return `true` if found, `false` otherwise
 2. **If object is `Value.Map`**:
-   - Check `map.containsKey(fieldName)` — maps use string keys
+   - `fieldName` is in a register — call `valueToString()` to get the string key
+   - Check `map.containsKey(fieldName)`
    - Return `true`/`false`
-3. **Otherwise**: return `false`
+3. **If object is `Value.Array`**: return `false` (arrays are out of scope)
+4. **Otherwise**: return `false`
 
 ---
 
