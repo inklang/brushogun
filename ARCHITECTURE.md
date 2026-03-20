@@ -1,13 +1,13 @@
-# Lectern Language Architecture
+# quill Language Architecture
 
 ## Overview
 
-Lectern is a compiled scripting language written in Kotlin that targets a register-based bytecode VM. It supports classes, first-class functions, string interpolation, default parameters, and iterator-based for loops. The compiler has a PaperMC dependency for embedding as a Minecraft scripting engine.
+quill is a compiled scripting language written in Kotlin that targets a register-based bytecode VM. It supports classes, first-class functions, string interpolation, default parameters, and iterator-based for loops. The compiler has a PaperMC dependency for embedding as a Minecraft scripting engine.
 
 ## Compilation Pipeline
 
 ```
-Source (.lec)
+Source (.quill)
     |
     v
  [Lexer]           tokenize()         Token stream
@@ -37,7 +37,7 @@ Source (.lec)
 ## Directory Structure
 
 ```
-src/main/kotlin/org/lectern/
+src/main/kotlin/org/quill/
   Main.kt                        Entry point, wires pipeline together
   lang/
     Token.kt                     TokenType enum + Token data class
@@ -70,20 +70,25 @@ src/main/kotlin/org/lectern/
     SsaOptPass.kt                Base interface for SSA optimization passes
     passes/
       SsaConstantPropagationPass.kt
+      SsaGlobalValueNumberingPass.kt  GVN within a single block
+      SsaCrossBlockGvnPass.kt    GVN across blocks using domination
       SsaDeadCodeEliminationPass.kt
   opt/
     OptPass.kt                   Base interface for IR optimization passes
     OptimizationPipeline.kt      Pass orchestration (fixed-point iteration)
     passes/
       ConstantFoldingPass.kt     IR-level constant folding
+      InductionVariablePass.kt   Range iterator -> arithmetic normalization
+      StrengthReductionPass.kt   Algebraic simplification (x*2 -> x+x, etc.)
       DeadCodeEliminationPass.kt Unreachable block + unused def removal
       CopyPropagationPass.kt     Redundant MOVE elimination
       LoopInvariantCodeMotionPass.kt  Hoist invariant code out of loops
+      BranchOptimizationPass.kt  Optimize conditional branches
   domain/
     Script.kt                    Empty placeholder
 
-lectern-intellij/                IntelliJ plugin (syntax highlighting, completion, formatting)
-lectern-vscode/                  VS Code extension
+quill-intellij/                IntelliJ plugin (syntax highlighting, completion, formatting)
+quill-vscode/                  VS Code extension
 docs/                            Docusaurus documentation site
 ```
 
@@ -147,7 +152,7 @@ Full SSA construction (Cytron et al.) is implemented with phi placement, variabl
 - `is` type checking operator
 - Range expressions (`a..b`)
 - Built-in `print()` function
-- Optimization pipeline (ConstantFolding, SsaConstantPropagation, SsaDeadCodeElimination, DeadCodeElimination)
+- Optimization pipeline (ConstantFolding, InductionVariable, Pre-SSA → SSA → GVN, constant propagation, dead code elimination, copy propagation, strength reduction, loop invariant code motion, branch optimization)
 
 ### Parsed But Not Lowered / Stub-Only
 
@@ -167,7 +172,7 @@ Full SSA construction (Cytron et al.) is implemented with phi placement, variabl
 ## Tests
 
 ```
-src/test/kotlin/org/lectern/
+src/test/kotlin/org/quill/
   ast/ControlFlowGraphTest.kt    CFG construction tests
   ssa/SsaTest.kt                 SSA building and pass tests
   opt/OptimizationPassesTest.kt  IR optimization pass tests
@@ -175,6 +180,6 @@ src/test/kotlin/org/lectern/
 
 ## Tooling
 
-- **lectern-intellij/** - IntelliJ IDEA plugin with syntax highlighting, code completion, brace matching, commenter, structure view, live templates, and formatting
-- **lectern-vscode/** - VS Code extension for Lectern
+- **quill-intellij/** - IntelliJ IDEA plugin with syntax highlighting, code completion, brace matching, commenter, structure view, live templates, and formatting
+- **quill-vscode/** - VS Code extension for quill
 - **docs/** - Docusaurus documentation website
