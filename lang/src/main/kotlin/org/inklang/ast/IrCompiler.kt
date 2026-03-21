@@ -196,6 +196,16 @@ class IrCompiler {
                 is IrInstr.IsType -> chunk.write(OpCode.IS_TYPE, dst = instr.dst, src1 = instr.src, imm = chunk.addString(instr.typeName))
                 is IrInstr.HasCheck -> chunk.write(OpCode.HAS, dst = instr.dst, src1 = instr.obj, imm = chunk.addString(instr.fieldName))
                 is IrInstr.LoadClass -> {
+                    // Pre-allocate function slots so indices are pre-determined and unique
+                    // Store as index -> methodName mapping
+                    val methodNameList = instr.methods.keys.toList()
+                    val preAllocatedIndices = mutableMapOf<Int, String>()  // slot index -> method name
+                    val methodStartIndex = chunk.functions.size
+                    for (methodName in methodNameList) {
+                        preAllocatedIndices[chunk.functions.size] = methodName
+                        chunk.functions.add(Chunk())  // placeholder, replaced below
+                    }
+
                     // Compile all methods in parallel using ForkJoinPool
                     val results: Map<String, CompiledMethod> = try {
                         val pool = ForkJoinPool.commonPool()
@@ -212,13 +222,13 @@ class IrCompiler {
                         instr.methods.mapValues { (_, methodInfo) -> compileMethod(methodInfo) }
                     }
 
-                    // Add compiled chunks sequentially and build method index
+                    // Replace placeholders with compiled chunks and build method index
                     val methodFuncIndices = mutableMapOf<String, Int>()
-                    for ((methodName, compiled) in results) {
-                        val funcIdx = chunk.functions.size
-                        chunk.functions.add(compiled.chunk)
-                        compiled.chunk.spillSlotCount = compiled.spillSlotCount
-                        methodFuncIndices[methodName] = funcIdx
+                    for ((slotIdx, methodName) in preAllocatedIndices) {
+                        val compiled = results[methodName]!!
+                        chunk.functions[slotIdx] = compiled.chunk
+                        chunk.functions[slotIdx].spillSlotCount = compiled.spillSlotCount
+                        methodFuncIndices[methodName] = slotIdx
                     }
 
                     // Add class info to chunk
