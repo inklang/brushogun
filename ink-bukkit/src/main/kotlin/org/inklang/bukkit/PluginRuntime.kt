@@ -2,12 +2,14 @@ package org.inklang.bukkit
 
 import org.inklang.InkCompiler
 import org.inklang.InkScript
+import org.inklang.ContextVM
 import org.inklang.lang.Value
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages loaded plugins — lifecycle, event registration, state.
+ * Each plugin gets a persistent ContextVM that lives for the server lifetime.
  */
 class PluginRuntime(
     private val plugin: InkBukkit,
@@ -22,11 +24,13 @@ class PluginRuntime(
         val enableScript: InkScript,
         val disableScript: InkScript?,
         val context: PluginContext,
-        val folder: File
+        val folder: File,
+        val vm: ContextVM  // Persistent per-plugin VM
     )
 
     /**
      * Load and enable a plugin from its .ink file.
+     * Creates a persistent VM for the plugin.
      */
     fun loadPlugin(pluginFile: File): Result<LoadedPlugin> {
         val pluginName = pluginFile.nameWithoutExtension
@@ -53,7 +57,7 @@ class PluginRuntime(
 
             // Extract enable and disable blocks
             // TODO: Extract enable/disable blocks from compiled script
-            // For now, we'll execute the full script for enable
+            // For now, we execute the full script for enable
             val enableScript = script
             val disableScript = script // TODO: Extract disable block
 
@@ -74,8 +78,22 @@ class PluginRuntime(
                 pluginFolder
             )
 
-            // Execute enable block
-            context.onEnable(enableScript)
+            // Create the persistent VM for this plugin
+            val vm = ContextVM(context)
+
+            // Pre-load configs from YAML files
+            val preloadedConfigs = script.preloadConfigs(pluginFolder.absolutePath)
+            vm.setGlobals(preloadedConfigs)
+
+            // Add Paper/Bukkit globals (player, server, etc.)
+            val paperGlobals = PaperGlobals.getGlobals(plugin.server.consoleSender, plugin.server)
+            vm.setGlobals(paperGlobals)
+
+            // Give the context a reference to its VM
+            context.setVM(vm)
+
+            // Execute enable block in the persistent VM
+            vm.execute(enableScript.getChunk())
 
             val loaded = LoadedPlugin(
                 name = pluginName,
@@ -83,7 +101,8 @@ class PluginRuntime(
                 enableScript = enableScript,
                 disableScript = disableScript,
                 context = context,
-                folder = pluginFolder
+                folder = pluginFolder,
+                vm = vm
             )
 
             loadedPlugins[pluginName] = loaded
@@ -96,12 +115,14 @@ class PluginRuntime(
     }
 
     /**
-     * Unload a plugin (execute disable block, clear events).
+     * Unload a plugin (execute disable block in same VM, then discard VM).
      */
     fun unloadPlugin(pluginName: String) {
         val loaded = loadedPlugins.remove(pluginName) ?: return
         try {
-            loaded.disableScript?.let { loaded.context.onDisable(it) }
+            loaded.disableScript?.let { disableScript ->
+                loaded.vm.execute(disableScript.getChunk())
+            }
         } catch (e: Exception) {
             plugin.logger.severe("Error during disable for $pluginName: ${e.message}")
         }
@@ -113,6 +134,23 @@ class PluginRuntime(
      */
     fun unloadAll() {
         loadedPlugins.keys.toList().forEach { unloadPlugin(it) }
+    }
+
+    /**
+     * Fire an event to all loaded plugins.
+     * Each plugin's handler runs in its own persistent VM.
+     */
+    fun fireEvent(eventName: String, event: Value.EventObject, data: List<Value?>): Boolean {
+        var cancelled = false
+        for (loaded in loadedPlugins.values) {
+            try {
+                val wasCancelled = loaded.context.fireEvent(eventName, event, data)
+                if (wasCancelled) cancelled = true
+            } catch (e: Exception) {
+                plugin.logger.severe("Error firing event $eventName to ${loaded.name}: ${e.message}")
+            }
+        }
+        return cancelled
     }
 
     fun getLoadedPlugins(): Map<String, LoadedPlugin> = loadedPlugins.toMap()

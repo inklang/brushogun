@@ -6,6 +6,7 @@ import org.inklang.InkIo
 import org.inklang.InkJson
 import org.inklang.InkDb
 import org.inklang.InkScript
+import org.inklang.ContextVM
 import org.inklang.lang.Value
 import java.io.File
 
@@ -19,6 +20,8 @@ class ScriptContext(
     private val json: InkJson,
     private val db: InkDb
 ) : InkContext {
+
+    private var vm: ContextVM? = null
 
     override fun log(message: String) {
         plugin.logger.info("[Ink] $message")
@@ -56,5 +59,9 @@ class ScriptContext(
 
     override fun onDisable(script: InkScript) {
         throw UnsupportedOperationException("Dynamic scripts do not support lifecycle")
+    }
+
+    override fun setVM(vm: ContextVM) {
+        this.vm = vm
     }
 }
