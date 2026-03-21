@@ -18,7 +18,8 @@ object LocationClass {
                 "pitch" to Value.NativeFunction { Value.Double(location.pitch.toDouble()) },
                 "block_x" to Value.NativeFunction { Value.Int(location.blockX) },
                 "block_y" to Value.NativeFunction { Value.Int(location.blockY) },
-                "block_z" to Value.NativeFunction { Value.Int(location.blockZ) }
+                "block_z" to Value.NativeFunction { Value.Int(location.blockZ) },
+                "world" to Value.NativeFunction { Value.String(location.world.name) }
             )
         )
     }

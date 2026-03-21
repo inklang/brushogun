@@ -1,12 +1,11 @@
 package org.inklang.bukkit.runtime
 
 import org.bukkit.entity.Player
-import org.bukkit.Server
 import org.inklang.lang.ClassDescriptor
 import org.inklang.lang.Value
 
 object InventoryClass {
-    fun createDescriptor(player: Player, server: Server): ClassDescriptor {
+    fun createDescriptor(player: Player): ClassDescriptor {
         return ClassDescriptor(
             name = "Inventory",
             superClass = null,

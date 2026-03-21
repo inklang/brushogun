@@ -74,7 +74,7 @@ object PlayerClass {
                 },
                 // Inventory
                 "inventory" to Value.NativeFunction { args ->
-                    Value.Instance(InventoryClass.createDescriptor(sender, server))
+                    Value.Instance(InventoryClass.createDescriptor(sender))
                 },
                 // Teleport
                 "teleport" to Value.NativeFunction { args ->
