@@ -19,6 +19,8 @@ import org.inklang.ssa.passes.SsaDeadCodeEliminationPass
 import org.inklang.ssa.passes.SsaGlobalValueNumberingPass
 import org.inklang.ssa.passes.SsaCrossBlockGvnPass
 
+import java.util.concurrent.ForkJoinPool
+
 class IrCompiler {
     companion object {
         fun optimizedSsaRoundTrip(
@@ -194,23 +196,31 @@ class IrCompiler {
                 is IrInstr.IsType -> chunk.write(OpCode.IS_TYPE, dst = instr.dst, src1 = instr.src, imm = chunk.addString(instr.typeName))
                 is IrInstr.HasCheck -> chunk.write(OpCode.HAS, dst = instr.dst, src1 = instr.obj, imm = chunk.addString(instr.fieldName))
                 is IrInstr.LoadClass -> {
-                    // Compile each method as a nested function chunk
-                    val methodFuncIndices = mutableMapOf<String, Int>()
-                    for ((methodName, methodInfo) in instr.methods) {
-                        // SSA round-trip on method body
-                        val methodSsa = SsaBuilder.build(methodInfo.instrs, methodInfo.constants, methodInfo.arity)
-                        val methodDeconstructed = SsaDeconstructor.deconstruct(methodSsa)
+                    // Compile all methods in parallel using ForkJoinPool
+                    val results: Map<String, CompiledMethod> = try {
+                        val pool = ForkJoinPool.commonPool()
+                        try {
+                            val tasks = instr.methods.mapValues { (_, methodInfo) ->
+                                pool.submit<CompiledMethod> { compileMethod(methodInfo) }
+                            }
+                            tasks.mapValues { (_, future) -> future.get() }
+                        } finally {
+                            pool.shutdown()
+                        }
+                    } catch (e: Exception) {
+                        // Fallback to sequential compilation on any pool failure
+                        instr.methods.mapValues { (_, methodInfo) -> compileMethod(methodInfo) }
+                    }
 
-                        val funcRanges = LivenessAnalyzer().analyze(methodDeconstructed)
-                        val methodAllocResult = RegisterAllocator().allocate(funcRanges, methodInfo.arity)
-                        val methodResolved = SpillInserter().insert(methodDeconstructed, methodAllocResult, funcRanges)
-                        val funcResult = AstLowerer.LoweredResult(methodResolved, methodInfo.constants)
-                        val funcChunk = IrCompiler().compile(funcResult)
-                        funcChunk.spillSlotCount = methodAllocResult.spillSlotCount
+                    // Add compiled chunks sequentially and build method index
+                    val methodFuncIndices = mutableMapOf<String, Int>()
+                    for ((methodName, compiled) in results) {
                         val funcIdx = chunk.functions.size
-                        chunk.functions.add(funcChunk)
+                        chunk.functions.add(compiled.chunk)
+                        compiled.chunk.spillSlotCount = compiled.spillSlotCount
                         methodFuncIndices[methodName] = funcIdx
                     }
+
                     // Add class info to chunk
                     val classIdx = chunk.classes.size
                     chunk.classes.add(ClassInfo(instr.name, instr.superClass, methodFuncIndices))
