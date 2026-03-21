@@ -11,6 +11,7 @@ import org.inklang.lang.Builtins
  * Creates Paper/Bukkit global objects exposed to Ink scripts.
  * These are passed to the VM at execution time via setGlobals().
  */
+@Deprecated("Use BukkitRuntimeRegistrar and ClassRegistry.getAllGlobals() instead", ReplaceWith("BukkitRuntimeRegistrar.register(sender, server); ClassRegistry.getAllGlobals()"))
 object PaperGlobals {
 
     /**

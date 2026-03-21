@@ -6,6 +6,8 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.inklang.ContextVM
 import org.inklang.InkScript
 import org.inklang.InkCompiler
+import org.inklang.bukkit.runtime.BukkitRuntimeRegistrar
+import org.inklang.lang.ClassRegistry
 import java.io.File
 
 class InkBukkit : JavaPlugin() {
@@ -132,9 +134,9 @@ class InkBukkit : JavaPlugin() {
             val preloadedConfigs = compiled.preloadConfigs(scriptDir.absolutePath)
             vm.setGlobals(preloadedConfigs)
 
-            // Add Paper/Bukkit globals (player, server, etc.)
-            val paperGlobals = PaperGlobals.getGlobals(sender, server)
-            vm.setGlobals(paperGlobals)
+            // Register Bukkit globals
+            BukkitRuntimeRegistrar.register(sender, server)
+            vm.setGlobals(ClassRegistry.getAllGlobals())
 
             vm.execute(compiled.getChunk())
             sender.sendMessage("§aScript executed successfully")

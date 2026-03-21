@@ -7,6 +7,8 @@ import org.inklang.InkJson
 import org.inklang.InkDb
 import org.inklang.InkScript
 import org.inklang.lang.Value
+import org.inklang.lang.ClassRegistry
+import org.inklang.bukkit.runtime.BukkitRuntimeRegistrar
 import java.io.File
 
 /**
@@ -49,17 +51,17 @@ class PluginContext(
 
     override fun onEnable(script: InkScript) {
         val vm = org.inklang.ContextVM(this)
-        // Add Paper/Bukkit globals (player, server, etc.)
-        val paperGlobals = PaperGlobals.getGlobals(sender, plugin.server)
-        vm.setGlobals(paperGlobals)
+        // Register Bukkit globals
+        BukkitRuntimeRegistrar.register(sender, plugin.server)
+        vm.setGlobals(ClassRegistry.getAllGlobals())
         vm.execute(script.getChunk())
     }
 
     override fun onDisable(script: InkScript) {
         val vm = org.inklang.ContextVM(this)
-        // Add Paper/Bukkit globals (player, server, etc.)
-        val paperGlobals = PaperGlobals.getGlobals(sender, plugin.server)
-        vm.setGlobals(paperGlobals)
+        // Register Bukkit globals
+        BukkitRuntimeRegistrar.register(sender, plugin.server)
+        vm.setGlobals(ClassRegistry.getAllGlobals())
         vm.execute(script.getChunk())
     }
 
