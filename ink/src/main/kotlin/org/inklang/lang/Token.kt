@@ -37,6 +37,8 @@ enum class TokenType {
     KW_CATCH,
     KW_FINALLY,
     KW_THROW,
+    KW_ON,
+    KW_EVENT,
     IDENTIFIER,
     PLUS,
     MINUS,

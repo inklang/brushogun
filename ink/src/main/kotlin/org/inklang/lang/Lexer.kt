@@ -56,7 +56,9 @@ private class Lexer(val source: String) {
             "catch" to TokenType.KW_CATCH,
             "finally" to TokenType.KW_FINALLY,
             "throw" to TokenType.KW_THROW,
-            "annotation" to TokenType.KW_ANNOTATION
+            "annotation" to TokenType.KW_ANNOTATION,
+            "on" to TokenType.KW_ON,
+            "event" to TokenType.KW_EVENT
         )
     }
 
