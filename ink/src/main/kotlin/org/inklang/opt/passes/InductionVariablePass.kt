@@ -318,7 +318,9 @@ class InductionVariablePass : OptPass {
                     newInstrs.add(instr)
                     // After last body instruction (right before backJumpIdx): add increment
                     if (idx == bodyRange.last) {
-                        newInstrs.add(IrInstr.BinaryOp(tempReg, TokenType.PLUS, valueReg, valueReg))
+                        val oneReg = (0..200).first { it !in usedRegs && it != valueReg && it != rangeEndReg }
+                        newInstrs.add(IrInstr.LoadImm(oneReg, oneIdx))
+                        newInstrs.add(IrInstr.BinaryOp(tempReg, TokenType.PLUS, valueReg, oneReg))
                         newInstrs.add(IrInstr.Move(valueReg, tempReg))
                     }
                 }
