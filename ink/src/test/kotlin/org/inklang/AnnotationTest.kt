@@ -20,6 +20,8 @@ class AnnotationTest {
         override fun io(): InkIo = throw UnsupportedOperationException("io not implemented in tests")
         override fun json(): InkJson = throw UnsupportedOperationException("json not implemented in tests")
         override fun db(): InkDb = throw UnsupportedOperationException("db not implemented in tests")
+        override fun registerEventHandler(eventName: String, handlerFunc: org.inklang.lang.Value.Function, eventParamName: String, dataParamNames: List<String>) {}
+        override fun fireEvent(eventName: String, event: org.inklang.lang.Value.EventObject, data: List<org.inklang.lang.Value?>): Boolean = true
     }
 
     @Test

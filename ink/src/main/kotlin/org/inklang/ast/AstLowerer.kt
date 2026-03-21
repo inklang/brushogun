@@ -1,5 +1,6 @@
 package org.inklang.ast
 
+import org.inklang.CompilationException
 import org.inklang.lang.*
 import org.inklang.lang.IrInstr.*
 

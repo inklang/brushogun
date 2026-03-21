@@ -36,11 +36,9 @@ class VM {
             println(args.joinToString(" ") { valueToString(it) })
             Value.Null
         },
-<<<<<<< HEAD:ink/src/main/kotlin/org/inklang/ast/VM.kt
         // Stdlib instances for import
         "math" to mathInstance,
         "random" to randomInstance,
-=======
 
         // Event registry for on-handler storage
         "__eventRegistry" to Value.Instance(ClassDescriptor("EventRegistry", null, mapOf())),
@@ -84,7 +82,6 @@ class VM {
                 Value.Instance(ClassDescriptor("EventInfo", null, mapOf("name" to Value.String(name))))
             }
         ), readOnly = true))
->>>>>>> d88c11f (feat: add event registry and cancel to ContextVM):lang/src/main/kotlin/org/quill/ast/VM.kt
     )
 
     data class CallFrame(
@@ -420,7 +417,6 @@ class VM {
                     registry.fields["__handlers"] = registry.fields["__handlers"] ?: Value.InternalList(mutableListOf())
                     val handlers = (registry.fields["__handlers"] as? Value.InternalList)!!
                     handlers.items.add(Value.EventHandler(Value.String(eventName), handlerFunc, Value.String(""), emptyList()))
-                }
                 }
             }
         }

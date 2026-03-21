@@ -482,6 +482,10 @@ class ContextVM(
                         }
                         throw ScriptException("Uncaught exception: $message")
                     }
+                    OpCode.REGISTER_EVENT -> {
+                        // Event handlers are registered at compile time via context.registerEventHandler()
+                        // At runtime this is a no-op
+                    }
                 }
             } catch (e: ScriptException) {
                 throw e
