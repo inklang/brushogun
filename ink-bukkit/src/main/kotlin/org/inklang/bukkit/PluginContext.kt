@@ -54,11 +54,10 @@ class PluginContext(
 
         var cancelled = false
         for (handler in handlers.items) {
-            if (handler is Value.EventHandler && handler.eventName == eventName) {
-                val argBuffer = ArrayDeque<Value>()
+            if (handler is Value.EventHandler && handler.eventName.value == eventName) {
+                val argBuffer = kotlin.collections.ArrayDeque<Value>()
                 argBuffer.addLast(event)
                 data.forEach { argBuffer.addLast(it ?: Value.Null) }
-                // TODO: use executeHandler when available
                 loaded.executeHandler(handler.handlerFunc, argBuffer)
             }
         }

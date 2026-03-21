@@ -6,6 +6,7 @@ import org.inklang.InkIo
 import org.inklang.InkJson
 import org.inklang.InkDb
 import org.inklang.InkScript
+import org.inklang.ContextVM
 import org.inklang.lang.Value
 
 class BukkitContext(
@@ -15,6 +16,8 @@ class BukkitContext(
     private val json: InkJson,
     private val db: InkDb
 ) : InkContext {
+    private var vm: ContextVM? = null
+
     override fun log(message: String) {
         plugin.logger.info("[Ink] $message")
     }
@@ -46,5 +49,11 @@ class BukkitContext(
 
     override fun onDisable(script: InkScript) {
         // Lifecycle hooks not yet implemented in bukkit context
+    }
+
+    override fun supportsLifecycle(): Boolean = false
+
+    override fun setVM(vm: ContextVM) {
+        this.vm = vm
     }
 }
