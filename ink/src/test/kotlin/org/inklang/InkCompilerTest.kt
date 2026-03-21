@@ -28,6 +28,7 @@ class InkCompilerTest {
         override fun fireEvent(eventName: String, event: org.inklang.lang.Value.EventObject, data: List<org.inklang.lang.Value?>): Boolean = true
         override fun onEnable(script: InkScript) {}
         override fun onDisable(script: InkScript) {}
+        override fun setVM(vm: ContextVM) {}
     }
 
     @Test
