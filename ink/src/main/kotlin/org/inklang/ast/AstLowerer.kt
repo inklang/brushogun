@@ -103,11 +103,9 @@ open class AstLowerer {
             }
         }
         is Stmt.ConfigStmt -> {
-            val dst = freshReg()
-            locals[stmt.name.lexeme] = dst
-            val configMarkerIdx = addConstant(Value.String("__config__${stmt.name.lexeme}"))
-            emit(IrInstr.LoadImm(dst, configMarkerIdx))
-            emit(IrInstr.StoreGlobal(stmt.name.lexeme, dst))
+            // Config values are loaded at runtime via InkScript.preloadConfigs()
+            // No IR emitted here — globals["${stmt.name.lexeme}"] is pre-populated
+            locals[stmt.name.lexeme] = freshReg()
         }
         is Stmt.TableStmt -> {
             val tableName = stmt.name.lexeme
