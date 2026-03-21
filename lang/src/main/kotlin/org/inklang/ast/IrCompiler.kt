@@ -209,14 +209,10 @@ class IrCompiler {
                     // Compile all methods in parallel using ForkJoinPool
                     val results: Map<String, CompiledMethod> = try {
                         val pool = ForkJoinPool.commonPool()
-                        try {
-                            val tasks = instr.methods.mapValues { (_, methodInfo) ->
-                                pool.submit<CompiledMethod> { compileMethod(methodInfo) }
-                            }
-                            tasks.mapValues { (_, future) -> future.get() }
-                        } finally {
-                            pool.shutdown()
+                        val tasks = instr.methods.mapValues { (_, methodInfo) ->
+                            pool.submit<CompiledMethod> { compileMethod(methodInfo) }
                         }
+                        tasks.mapValues { (_, future) -> future.get() }
                     } catch (e: Exception) {
                         // Fallback to sequential compilation on any pool failure
                         instr.methods.mapValues { (_, methodInfo) -> compileMethod(methodInfo) }
