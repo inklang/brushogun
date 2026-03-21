@@ -159,6 +159,12 @@ class AstLowerer {
         }
         // Annotation declarations are compile-time only - no IR emitted
         is Stmt.AnnotationDeclStmt -> { /* no-op */ }
+        is Stmt.EventDeclStmt -> {
+            // Event declarations are handled at runtime by the event system
+        }
+        is Stmt.OnHandlerStmt -> {
+            // On-handler statements are handled at runtime by the event system
+        }
     }
 
     private fun lowerVar(stmt: Stmt.VarStmt) {

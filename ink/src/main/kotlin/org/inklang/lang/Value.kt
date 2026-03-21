@@ -87,6 +87,22 @@ sealed class Value {
      * Allows method dispatch via GET_FIELD on the QueryBuilder interface methods.
      */
     data class QueryBuilderInstance(val queryBuilder: org.inklang.InkQueryBuilder) : Value()
+
+    /** Event object passed to handlers */
+    data class EventObject(
+        val eventName: String,
+        val cancellable: kotlin.Boolean,
+        var cancelled: kotlin.Boolean = false,
+        val data: List<Value?>
+    ) : Value()
+
+    /** Event handler registered via `on` */
+    data class EventHandler(
+        val eventName: String,
+        val handlerFunc: Value.Function,
+        val eventParamName: String,
+        val dataParamNames: List<String>
+    ) : Value()
 }
 
 // === String method helpers ===

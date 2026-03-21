@@ -154,4 +154,25 @@ sealed class Stmt {
     data class AnnotationField(val name: Token, val type: Token, val defaultValue: Expr?)
     data class AnnotationDeclStmt(val name: Token, val fields: List<AnnotationField>) : Stmt()
 
+    // Parameter in an event declaration: player: Player
+    data class EventParam(
+        val name: Token,
+        val type: Token
+    )
+
+    // Event declaration: event player_join(player: Player)
+    data class EventDeclStmt(
+        val name: Token,
+        val params: List<EventParam>
+    ) : Stmt()
+
+    // On-handler registration: on player_join(event, player) { ... }
+    data class OnHandlerStmt(
+        val eventName: Token,
+        val handlerName: Token?,  // null if not named
+        val eventParam: Token,   // user-named first param (the event object)
+        val dataParams: List<EventParam>,
+        val body: Stmt.BlockStmt
+    ) : Stmt()
+
 }
