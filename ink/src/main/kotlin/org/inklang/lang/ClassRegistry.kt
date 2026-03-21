@@ -1,7 +1,9 @@
 package org.inklang.lang
 
+import java.util.concurrent.ConcurrentHashMap
+
 object ClassRegistry {
-    private val globals = mutableMapOf<String, ClassDescriptor>()
+    private val globals = ConcurrentHashMap<String, ClassDescriptor>()
 
     fun registerGlobal(name: String, descriptor: ClassDescriptor) {
         globals[name] = descriptor
