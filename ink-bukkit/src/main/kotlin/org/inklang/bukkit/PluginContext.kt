@@ -6,8 +6,10 @@ import org.inklang.InkIo
 import org.inklang.InkJson
 import org.inklang.InkDb
 import org.inklang.InkScript
+import org.inklang.ContextVM
 import org.inklang.lang.Value
 import java.io.File
+import java.util.ArrayDeque
 
 /**
  * Extended context for plugin scripts with lifecycle support.
@@ -21,6 +23,8 @@ class PluginContext(
     private val pluginName: String,
     private val pluginFolder: File
 ) : InkContext {
+
+    private var vm: ContextVM? = null
 
     override fun log(message: String) {
         plugin.logger.info("[Ink/$pluginName] $message")
@@ -44,18 +48,38 @@ class PluginContext(
     }
 
     override fun fireEvent(eventName: String, event: Value.EventObject, data: List<Value?>): Boolean {
-        return false
+        val loaded = vm ?: return false
+        val registry = loaded.globals["__eventRegistry"] as? Value.Instance ?: return false
+        val handlers = registry.fields["__handlers"] as? Value.InternalList ?: return false
+
+        var cancelled = false
+        for (handler in handlers.items) {
+            if (handler is Value.EventHandler && handler.eventName == eventName) {
+                val argBuffer = ArrayDeque<Value>()
+                argBuffer.addLast(event)
+                data.forEach { argBuffer.addLast(it ?: Value.Null) }
+                // TODO: use executeHandler when available
+                loaded.executeHandler(handler.handlerFunc, argBuffer)
+            }
+        }
+        return cancelled
     }
 
     override fun onEnable(script: InkScript) {
-        script.execute(this)
+        // No-op: VM executes enable directly via PluginRuntime
     }
 
     override fun onDisable(script: InkScript) {
-        script.execute(this)
+        // No-op: VM executes disable directly via PluginRuntime
     }
 
     override fun supportsLifecycle(): Boolean = true
+
+    override fun setVM(vm: ContextVM) {
+        this.vm = vm
+    }
+
+    fun getVM(): ContextVM? = vm
 
     fun getPluginFolder(): File = pluginFolder
     fun getPluginName(): String = pluginName
