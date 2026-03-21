@@ -37,6 +37,18 @@ class PluginRuntime(
 
         return try {
             val source = pluginFile.readText()
+
+            // Validate plugin has required enable/disable blocks
+            val parsedStatements = compiler.parse(source)
+            val validationResult = compiler.validatePluginScript(parsedStatements)
+            if (!validationResult.isValid()) {
+                return Result.failure(
+                    IllegalStateException(
+                        "Invalid plugin ${pluginFile.name}: ${validationResult.errors.joinToString("; ")}"
+                    )
+                )
+            }
+
             val script = compiler.compile(source, pluginName)
 
             // Extract enable and disable blocks

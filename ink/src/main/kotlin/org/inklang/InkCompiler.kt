@@ -21,10 +21,53 @@ class CompilationException(
 ) : RuntimeException(message, cause)
 
 /**
+ * Result of plugin script validation.
+ */
+data class ValidationResult(val errors: List<String>) {
+    fun isValid() = errors.isEmpty()
+}
+
+/**
  * Main compiler API for Quill scripts.
  * Compiles source code to InkScript instances that can be executed.
  */
 class InkCompiler {
+    /**
+     * Parse source code to a list of AST statements.
+     *
+     * @param source The Quill source code
+     * @return List of parsed statements
+     */
+    fun parse(source: String): List<Stmt> {
+        val tokens = tokenize(source)
+        val parser = Parser(tokens)
+        return parser.parse()
+    }
+
+    /**
+     * Validates that a plugin script has required enable and disable blocks.
+     * @param statements The parsed AST statements
+     * @return ValidationResult indicating success or list of errors
+     */
+    fun validatePluginScript(statements: List<Stmt>): ValidationResult {
+        var hasEnable = false
+        var hasDisable = false
+
+        for (stmt in statements) {
+            when (stmt) {
+                is Stmt.EnableStmt -> hasEnable = true
+                is Stmt.DisableStmt -> hasDisable = true
+                else -> {}
+            }
+        }
+
+        val errors = mutableListOf<String>()
+        if (!hasEnable) errors.add("Plugin must have an 'enable {}' block")
+        if (!hasDisable) errors.add("Plugin must have a 'disable {}' block")
+
+        return ValidationResult(errors)
+    }
+
     /**
      * Compile Quill source code to a InkScript.
      *
