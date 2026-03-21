@@ -59,6 +59,10 @@ class PluginContext(
                 argBuffer.addLast(event)
                 data.forEach { argBuffer.addLast(it ?: Value.Null) }
                 loaded.executeHandler(handler.handlerFunc, argBuffer)
+                if (event.cancelled) {
+                    cancelled = true
+                    // Don't break - let all handlers run (InkLang semantics)
+                }
             }
         }
         return cancelled
