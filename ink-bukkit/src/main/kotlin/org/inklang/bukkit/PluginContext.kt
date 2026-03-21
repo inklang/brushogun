@@ -1,6 +1,7 @@
 package org.inklang.bukkit
 
 import org.bukkit.command.CommandSender
+import org.inklang.ContextVM
 import org.inklang.InkContext
 import org.inklang.InkIo
 import org.inklang.InkJson
@@ -23,6 +24,12 @@ class PluginContext(
     private val pluginName: String,
     private val pluginFolder: File
 ) : InkContext {
+
+    private var vm: ContextVM? = null
+
+    override fun setVM(vm: ContextVM) {
+        this.vm = vm
+    }
 
     override fun log(message: String) {
         plugin.logger.info("[Ink/$pluginName] $message")
