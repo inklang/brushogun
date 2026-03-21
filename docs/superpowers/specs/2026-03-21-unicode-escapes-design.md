@@ -27,10 +27,14 @@ Add `\uXXXX` handling to the existing `unescape()` function in `Parser.kt`:
 
 ```kotlin
 'u'  -> {
-    val hex = s.substring(i + 2, i + 6)
-    if (hex.all { it in "0123456789abcdefABCDEF" }) {
-        append(hex.toInt(16).toChar())
-        i += 6
+    if (i + 6 <= s.length) {
+        val hex = s.substring(i + 2, i + 6)
+        if (hex.all { it in "0123456789abcdefABCDEF" }) {
+            append(hex.toInt(16).toChar())
+            i += 6
+        } else {
+            append(s[i]); i++
+        }
     } else {
         append(s[i]); i++
     }
@@ -41,7 +45,7 @@ Add `\uXXXX` handling to the existing `unescape()` function in `Parser.kt`:
 - Reads exactly 4 hex digits after `\u`
 - Converts to the corresponding Unicode character
 - Advances cursor past the full 6-character sequence
-- If hex digits are invalid or insufficient, passes through literally (or could error — following Kotlin's lenient approach here)
+- If fewer than 4 hex digits remain, or if hex digits are invalid, passes through literally (e.g., `\uGGGG` → `\uGGGG`, `\u1` → `\u1`, `\u` at end of string → `\u`)
 
 ### Syntax Examples
 
