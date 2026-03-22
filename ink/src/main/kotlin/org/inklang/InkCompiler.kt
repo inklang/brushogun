@@ -11,6 +11,7 @@ import org.inklang.lang.IrCompiler
 import org.inklang.lang.Parser
 import org.inklang.lang.Stmt
 import org.inklang.lang.tokenize
+import org.inklang.peg.CompilerPipeline
 
 /**
  * Exception thrown when compilation fails.
@@ -136,5 +137,21 @@ class InkCompiler {
         } catch (e: Exception) {
             throw CompilationException("Compilation failed: ${e.message}", e)
         }
+    }
+
+    /**
+     * Compile using the PEG-based pipeline (CompilerPipeline).
+     *
+     * This method uses the PEG-based CompilerPipeline which parses source code
+     * using InkGrammar.expression and passes the result through the existing
+     * IR pipeline.
+     *
+     * @param source The Quill source code
+     * @return CompiledScript ready for execution
+     * @throws CompilationException if compilation fails
+     */
+    fun compileWithPeg(source: String): CompiledScript {
+        val pipeline = CompilerPipeline()
+        return pipeline.compile(source)
     }
 }

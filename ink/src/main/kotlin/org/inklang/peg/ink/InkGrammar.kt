@@ -60,8 +60,9 @@ class InkGrammar {
             private val ident = identifier()
 
             override fun parse(input: String, position: Int): ParseResult<Expr> {
-                // Try parenthesized expressions first (before identifiers since parentheses don't look like identifiers)
-                val groupingResult = grouping(callExpr(primary())).parse(input, position)
+                // Try parenthesized expressions (before identifiers since parentheses don't look like identifiers)
+                // Use grouping(expression) NOT grouping(callExpr(primary())) to avoid infinite recursion
+                val groupingResult = grouping(expression).parse(input, position)
                 if (groupingResult is ParseResult.Success) return groupingResult
 
                 // Try literals first in order of specificity
@@ -330,8 +331,9 @@ class InkGrammar {
         }
     }
 
-    // Full expression parser
-    val expression: Parser<Expr> = assignment(unary())
+    // Full expression parser - lazy to break initialization cycle with primary()
+    // primary() calls grouping(expression), so expression must be accessible when primary().parse() runs
+    val expression: Parser<Expr> by lazy { assignment(unary()) }
 
     /**
      * Parses a complete expression string.
