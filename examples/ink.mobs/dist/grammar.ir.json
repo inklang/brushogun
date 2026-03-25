@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "package": "ink.mobs",
+  "keywords": [
+    "mob",
+    "equipment",
+    "drops",
+    "experience",
+    "on_spawn",
+    "on_death",
+    "on_damage",
+    "on_damaged",
+    "on_explode",
+    "on_target",
+    "on_interact",
+    "on_enter_combat",
+    "on_leave_combat",
+    "on_tick",
+    "every",
+    "head",
+    "main",
+    "offhand",
+    "legs",
+    "chest",
+    "helmet",
+    "chestplate",
+    "leggings",
+    "boots"
+  ],
+  "rules": {
+    "ink.mobs/equipment_slot": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          {
+            "type": "choice",
+            "items": [
+              { "type": "keyword", "value": "head" },
+              { "type": "keyword", "value": "main" },
+              { "type": "keyword", "value": "offhand" },
+              { "type": "keyword", "value": "legs" },
+              { "type": "keyword", "value": "chest" },
+              { "type": "keyword", "value": "helmet" },
+              { "type": "keyword", "value": "chestplate" },
+              { "type": "keyword", "value": "leggings" },
+              { "type": "keyword", "value": "boots" }
+            ]
+          },
+          { "type": "literal", "value": ":" },
+          { "type": "identifier" }
+        ]
+      }
+    },
+    "ink.mobs/equipment_block": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "keyword", "value": "equipment" },
+          { "type": "block", "scope": null }
+        ]
+      }
+    },
+    "ink.mobs/drop_entry": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "identifier" },
+          { "type": "optional", "item": { "type": "identifier" } },
+          { "type": "optional", "item": { "type": "identifier" } }
+        ]
+      }
+    },
+    "ink.mobs/drops_block": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "keyword", "value": "drops" },
+          { "type": "block", "scope": null }
+        ]
+      }
+    },
+    "ink.mobs/experience_field": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "keyword", "value": "experience" },
+          { "type": "literal", "value": ":" },
+          { "type": "int" }
+        ]
+      }
+    },
+    "ink.mobs/trigger_threshold": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "identifier" },
+          { "type": "int" }
+        ]
+      }
+    },
+    "ink.mobs/skill_event": {
+      "rule": {
+        "type": "choice",
+        "items": [
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_spawn" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_death" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_damage" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_damaged" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_explode" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_target" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_interact" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_enter_combat" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_leave_combat" }, { "type": "optional", "item": { "type": "ref", "rule": "ink.mobs/trigger_threshold" } }] },
+          { "type": "seq", "items": [{ "type": "keyword", "value": "on_tick" }, { "type": "optional", "item": { "type": "keyword", "value": "every" } }, { "type": "int" }] }
+        ]
+      }
+    },
+    "ink.mobs/skill_call": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "identifier" },
+          { "type": "many", "item": { "type": "identifier" } }
+        ]
+      }
+    },
+    "ink.mobs/skills_block": {
+      "rule": {
+        "type": "seq",
+        "items": [
+          { "type": "keyword", "value": "skills" },
+          { "type": "block", "scope": null }
+        ]
+      }
+    }
+  },
+  "declarations": [
+    {
+      "keyword": "mob",
+      "nameRule": { "type": "identifier" },
+      "scopeRules": [
+        "ink.mobs/equipment_block",
+        "ink.mobs/drops_block",
+        "ink.mobs/experience_field",
+        "ink.mobs/skills_block"
+      ],
+      "inheritsBase": true
+    }
+  ]
+}
