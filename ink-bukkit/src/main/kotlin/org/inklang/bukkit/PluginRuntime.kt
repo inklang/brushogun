@@ -6,6 +6,7 @@ import org.inklang.ContextVM
 import org.inklang.lang.Value
 import org.inklang.bukkit.handlers.MobHandler
 import org.inklang.bukkit.handlers.MobListener
+import org.inklang.bukkit.handlers.MobSkills
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -92,6 +93,9 @@ class PluginRuntime(
             // Add Paper/Bukkit globals (player, server, etc.)
             val paperGlobals = PaperGlobals.getGlobals(plugin.server.consoleSender, plugin.server)
             vm.setGlobals(paperGlobals)
+
+            // Add MobSkills functions as globals for mob event handlers
+            vm.setGlobals(MobSkills.asNativeFunctionMap())
 
             // Give the context a reference to its VM
             context.setVM(vm)
